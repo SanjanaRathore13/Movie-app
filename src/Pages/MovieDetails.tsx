@@ -2,7 +2,7 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Movie } from "../type";
-import { db } from "../firebaseConfig"; // Make sure Firebase is correctly initialized
+import { db } from "../firebaseConfig"; 
 import {
   addDoc,
   collection,
