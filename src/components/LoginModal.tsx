@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebaseConfig";
-import { toast } from "react-toastify"; // ✅ Import toast
+import { toast } from "react-toastify"; 
 
 interface LoginModalProps {
   onClose: () => void;
@@ -16,11 +16,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      toast.success("Logged in successfully!"); // ✅ Toast on success
+      toast.success("Logged in successfully!"); 
       onClose();
     } catch (err: any) {
       setError(err.message);
-      toast.error("Login failed. Please check your credentials."); // ❌ Toast on error
+      toast.error("Login failed. Please check your credentials."); 
     }
   };
 
