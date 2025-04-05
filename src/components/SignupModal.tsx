@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebaseConfig";
-import { toast } from "react-toastify"; // ✅ Toast import
+import { toast } from "react-toastify"; 
 
 interface SignupModalProps {
   onClose: () => void;
@@ -16,11 +16,11 @@ const SignupModal: React.FC<SignupModalProps> = ({ onClose }) => {
     e.preventDefault();
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      toast.success("Signup successful! 🎉"); // ✅ Toast on success
+      toast.success("Signup successful! 🎉"); 
       onClose();
     } catch (err: any) {
       setError(err.message);
-      toast.error("Signup failed. Please try again."); // ❌ Toast on error
+      toast.error("Signup failed. Please try again."); 
     }
   };
 
