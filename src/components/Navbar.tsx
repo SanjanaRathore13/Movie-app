@@ -1,70 +1,53 @@
-import * as React from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { signOut } from "firebase/auth";
-import { auth } from "../firebaseConfig";
 import LoginModal from "./LoginModal";
 import SignupModal from "./SignupModal";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "../firebaseConfig";
 
-const Navbar: React.FC = () => {
-  const { user } = useAuth();
+const Navbar = () => {
+  const [showLogin, setShowLogin] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
-  const [showLogin, setShowLogin] = React.useState(false);
-  const [showSignup, setShowSignup] = React.useState(false);
+  // Correctly track user auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      console.log("Logged out successfully");
-    } catch (error) {
-      console.error("Logout error", error);
-    }
+  const handleLogout = () => {
+    signOut(auth);
   };
 
   return (
     <>
-      <nav className="bg-gray-900 text-white p-4 flex justify-between items-center">
-        <Link to="/" className="text-2xl font-bold">Movie-App</Link>
-        <ul className="flex space-x-4 items-center">
-          <li><Link to="/" className="hover:text-yellow-400">Home</Link></li>
-          <li><Link to="/movies" className="hover:text-yellow-400">Movies</Link></li>
-          <li><Link to="/search" className="hover:text-yellow-400">Search</Link></li>
-          {user ? (
+      <nav className="flex flex-col md:flex-row justify-between items-center px-6 py-4 bg-gradient-to-r from-purple-700 via-indigo-600 to-yellow-400 text-white shadow-md z-50">
+        <Link to="/" className="text-2xl font-bold mb-2 md:mb-0">
+          🎬 <span className="text-yellow-300">Cineverse</span>
+        </Link>
+
+        <div className="flex gap-4 items-center text-base font-medium">
+          <Link to="/movies" className="hover:underline hover:text-yellow-300 transition">Explore Movies</Link>
+          <Link to="/actors" className="hover:underline hover:text-yellow-300 transition">Browse Actors</Link>
+          <Link to="/watchlist" className="hover:underline hover:text-yellow-300 transition">Your Watchlist</Link>
+
+          {!user ? (
             <>
-              <li className="text-yellow-300">Hello, {user.email}</li>
-              <li>
-                <button
-                  onClick={handleLogout}
-                  className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
-                >
-                  Logout
-                </button>
-              </li>
+              <button onClick={() => setShowLogin(true)} className="hover:text-green-300 transition">Login</button>
+              <button onClick={() => setShowSignup(true)} className="hover:text-blue-300 transition">Signup</button>
             </>
           ) : (
             <>
-              <li>
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="hover:text-yellow-400"
-                >
-                  Login
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setShowSignup(true)}
-                  className="hover:text-yellow-400"
-                >
-                  Signup
-                </button>
-              </li>
+              <span className="text-sm font-semibold">{user.email}</span>
+              <button onClick={handleLogout} className="hover:text-red-400 transition">Logout</button>
             </>
           )}
-        </ul>
+        </div>
       </nav>
 
-      {/* Modals */}
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
       {showSignup && <SignupModal onClose={() => setShowSignup(false)} />}
     </>

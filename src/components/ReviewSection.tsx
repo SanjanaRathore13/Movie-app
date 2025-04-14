@@ -1,159 +1,144 @@
-import React, { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-  doc,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "../firebaseConfig";
-import { useAuth } from "../context/AuthContext";
-import StarRating from "./StarRating";
-import { toast } from "react-toastify"; // ✅ toast import
+import React, { useState, useEffect } from "react";
+import { db } from "../firebaseConfig"; // Ensure you have this file properly configured
+import { collection, query, where, onSnapshot, updateDoc, doc, getDoc } from "firebase/firestore";
+import { useAuth } from "../context/AuthContext"; // Assuming you have authentication context
 
 interface Review {
   id: string;
   userId: string;
-  text: string;
+  username: string;
   rating: number;
-  timestamp: Timestamp;
+  comment: string;
+  timestamp: any;
+  upvotes: number;
+  downvotes: number;
 }
 
-const ReviewSection: React.FC<{ movieId: number }> = ({ movieId }) => {
-  const { user } = useAuth();
+interface ReviewSectionProps {
+  movieId: string | undefined; // Change here to allow undefined
+}
+
+const ReviewSection: React.FC<ReviewSectionProps> = ({ movieId }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [newReview, setNewReview] = useState("");
-  const [rating, setRating] = useState(0);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [sortOption, setSortOption] = useState<string>("recent"); // Default sorting by 'recent'
+  const { user } = useAuth(); // Assuming you're using authentication context
 
-  const fetchReviews = async () => {
-    const q = query(collection(db, "reviews"), where("movieId", "==", movieId));
-    const querySnapshot = await getDocs(q);
-    const reviewData: Review[] = [];
+  // Fetch reviews for the given movieId
+  useEffect(() => {
+    if (!movieId) return;
 
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      reviewData.push({
-        id: docSnap.id,
-        userId: data.userId,
-        text: data.text,
-        rating: data.rating,
-        timestamp: data.timestamp,
+    const q = query(
+      collection(db, "reviews"),
+      where("movieId", "==", movieId)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedReviews: Review[] = snapshot.docs.map((doc) => {
+        const reviewData = doc.data() as Omit<Review, 'id'>; // Omit id from object to return correct structure
+        return {
+          id: doc.id, // Attach the ID separately
+          ...reviewData, // Spread the rest of the review fields
+        };
       });
+      setReviews(fetchedReviews); // Set the reviews state
     });
 
-    setReviews(reviewData);
-  };
-
-  useEffect(() => {
-    fetchReviews();
+    return () => unsubscribe(); // Clean up subscription when component unmounts
   }, [movieId]);
 
-  const handleAddOrUpdate = async () => {
-    if (!user) return;
+  // Function to handle sorting of reviews
+  const sortReviews = (reviews: Review[]) => {
+    if (sortOption === "recent") {
+      return reviews.sort((a, b) => b.timestamp - a.timestamp); // Sort by most recent
+    } else if (sortOption === "helpful") {
+      return reviews.sort((a, b) => b.upvotes - a.upvotes); // Sort by most upvotes (helpfulness)
+    }
+    return reviews; // Default sorting (no specific sort)
+  };
+
+  // Handle upvote/downvote actions
+  const handleVote = async (reviewId: string, voteType: "upvote" | "downvote") => {
+    if (!user) {
+      alert("You must be logged in to vote on reviews.");
+      return;
+    }
+
+    const reviewRef = doc(db, "reviews", reviewId);
 
     try {
-      if (editingId) {
-        await updateDoc(doc(db, "reviews", editingId), {
-          text: newReview,
-          rating,
-        });
-        toast.success("Review updated ✏️");
-      } else {
-        await addDoc(collection(db, "reviews"), {
-          movieId,
-          userId: user.uid,
-          text: newReview,
-          rating,
-          timestamp: Timestamp.now(),
-        });
-        toast.success("Review added ✅");
+      // Fetch the document data using getDoc (it returns a DocumentSnapshot)
+      const reviewDoc = await getDoc(reviewRef);
+      if (!reviewDoc.exists()) {
+        console.log("Review not found");
+        return;
       }
 
-      setNewReview("");
-      setRating(0);
-      setEditingId(null);
-      fetchReviews();
+      const reviewData = reviewDoc.data();
+      const currentUpvotes = reviewData?.upvotes || 0;
+      const currentDownvotes = reviewData?.downvotes || 0;
+
+      // Increment or decrement based on the vote type
+      const newUpvotes = voteType === "upvote" ? currentUpvotes + 1 : currentUpvotes;
+      const newDownvotes = voteType === "downvote" ? currentDownvotes + 1 : currentDownvotes;
+
+      // Update the review document in Firestore
+      await updateDoc(reviewRef, {
+        upvotes: newUpvotes,
+        downvotes: newDownvotes,
+      });
+
+      console.log(`Review ${voteType}d successfully.`);
     } catch (error) {
-      toast.error("Failed to submit review ❌");
-      console.error("Review submit error:", error);
+      console.error("Error updating review votes:", error);
     }
   };
-
-  const handleEdit = (review: Review) => {
-    setEditingId(review.id);
-    setNewReview(review.text);
-    setRating(review.rating);
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, "reviews", id));
-      setReviews((prev) => prev.filter((r) => r.id !== id));
-      toast.success("Review deleted 🗑️");
-    } catch (error) {
-      toast.error("Failed to delete review ❌");
-      console.error("Delete error:", error);
-    }
-  };
-
-  const averageRating =
-    reviews.length > 0
-      ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-      : null;
 
   return (
-    <div className="text-white">
-      {averageRating && (
-        <p className="mb-2 text-yellow-400 font-semibold">
-          ⭐ Average Rating: {averageRating}/5
-        </p>
-      )}
+    <div className="text-white space-y-4">
+      <h2 className="text-2xl font-semibold">Reviews</h2>
 
-      {user ? (
-        <div className="mb-4">
-          <StarRating rating={rating} onRatingChange={setRating} />
-          <textarea
-            value={newReview}
-            onChange={(e) => setNewReview(e.target.value)}
-            placeholder="Write a review..."
-            className="w-full p-2 rounded mt-2 text-black"
-          />
-          <button onClick={handleAddOrUpdate} className="mt-2 px-4 py-2 bg-blue-600 rounded">
-            {editingId ? "Update" : "Submit"}
-          </button>
-        </div>
+      {/* Sort dropdown */}
+      <div className="mb-4">
+        <label className="mr-2 text-sm">Sort By:</label>
+        <select
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value)}
+          className="bg-gray-700 text-white p-2 rounded"
+        >
+          <option value="recent">Most Recent</option>
+          <option value="helpful">Most Helpful</option>
+        </select>
+      </div> {/* Closing div for the sort dropdown */}
+
+      {reviews.length === 0 ? (
+        <p className="text-gray-400">No reviews yet.</p>
       ) : (
-        <p className="text-sm text-gray-300">Please log in to write a review.</p>
-      )}
+        sortReviews(reviews).map((review) => (
+          <div key={review.id} className="border p-4 rounded bg-gray-800">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-bold">{review.username}</span>
+              <span>⭐ {review.rating}</span>
+            </div>
+            <p>{review.comment}</p>
 
-      <div className="space-y-3 mt-4">
-        {reviews.map((review) => (
-          <div key={review.id} className="border-b border-gray-600 pb-2">
-            <p>⭐ {review.rating} - {review.text}</p>
-            {user?.uid === review.userId && (
-              <div className="text-sm mt-1">
-                <button
-                  onClick={() => handleEdit(review)}
-                  className="text-blue-400 hover:underline mr-4"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(review.id)}
-                  className="text-red-400 hover:underline"
-                >
-                  Delete
-                </button>
-              </div>
-            )}
+            {/* Voting buttons */}
+            <div className="flex mt-2">
+              <button
+                onClick={() => handleVote(review.id, "upvote")}
+                className="bg-green-500 text-white px-4 py-2 rounded mr-2"
+              >
+                Upvote ({review.upvotes})
+              </button>
+              <button
+                onClick={() => handleVote(review.id, "downvote")}
+                className="bg-red-500 text-white px-4 py-2 rounded"
+              >
+                Downvote ({review.downvotes})
+              </button>
+            </div>
           </div>
-        ))}
-      </div>
+        ))
+      )}
     </div>
   );
 };

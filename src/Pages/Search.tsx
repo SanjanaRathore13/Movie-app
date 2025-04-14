@@ -1,68 +1,57 @@
-import * as React from "react";
-import { useState } from "react";
-import { fetchMovies } from "../api/tmdb";
+// src/components/SearchBar.tsx
+import React, { useEffect, useState } from "react";
+import { fetchMoviesBySearch } from "../api/omdb";
+import { Movie } from "../type";
+import { Link } from "react-router-dom";
 
-const Search: React.FC = () => {
+const SearchBar = () => {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
-  const [noResults, setNoResults] = useState(false);
+  const [results, setResults] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-  
-    const endpoint = `/search/movie?query=${encodeURIComponent(query)}`;
-    console.log("Fetching from:", endpoint); // 👈 Logs the final URL path
-  
-    const data = await fetchMovies(endpoint);
-    console.log("API Response:", data);
-    
-    if (data && data.results && data.results.length > 0) {
-      setResults(data.results);
-      setNoResults(false);
-    } else {
-      setResults([]);
-      setNoResults(true);
-    }
-  };
-  
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      if (query.length > 2) {
+        setLoading(true);
+        fetchMoviesBySearch(query).then((data) => {
+          setResults(data);
+          setLoading(false);
+        });
+      } else {
+        setResults([]);
+      }
+    }, 500); // debounce delay
+
+    return () => clearTimeout(delayDebounce);
+  }, [query]);
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Search Movies</h2>
-      <div className="flex space-x-2 mb-4">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded w-full text-black"
-          placeholder="Enter movie name"
-        />
-        <button
-          onClick={handleSearch}
-          className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
-        >
-          Search
-        </button>
-      </div>
+    <div className="relative w-full max-w-xl mx-auto mt-8 text-black">
+      <input
+        type="text"
+        placeholder="Search for movies, shows, or actors..."
+        className="w-full px-4 py-2 rounded-lg shadow-md outline-none focus:ring focus:ring-yellow-500"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
 
-      {noResults && (
-        <p className="text-red-500 text-center">No results found. Try something else!</p>
+      {loading && <p className="text-white mt-2">Loading...</p>}
+
+      {results.length > 0 && (
+        <div className="absolute w-full bg-white shadow-lg rounded-b-lg mt-2 z-10 max-h-64 overflow-y-auto">
+          {results.map((movie) => (
+            <Link
+              to={`/movie/${movie.imdbID}`}
+              key={movie.imdbID}
+              className="block px-4 py-2 hover:bg-gray-100 border-b"
+            >
+              🎬 {movie.Title} ({movie.Year})
+            </Link>
+          ))}
+        </div>
       )}
-
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {results.map((movie) => (
-          <div key={movie.id} className="bg-gray-800 text-white p-4 rounded shadow">
-            <img
-              src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-              alt={movie.title}
-              className="w-full h-auto rounded mb-2"
-            />
-            <h3 className="text-lg">{movie.title}</h3>
-          </div>
-        ))}
-      </div>
     </div>
   );
 };
 
-export default Search;
+export default SearchBar;

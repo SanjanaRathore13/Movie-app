@@ -3,18 +3,26 @@ import { FaStar } from "react-icons/fa";
 
 interface StarRatingProps {
   rating: number;
-  onRatingChange: (rating: number) => void;
+  setRating?: (value: number) => void;
+  readOnly?: boolean;
 }
 
-const StarRating: React.FC<StarRatingProps> = ({ rating, onRatingChange }) => {
+const StarRating: React.FC<StarRatingProps> = ({
+  rating,
+  setRating,
+  readOnly = false,
+}) => {
   return (
-    <div className="flex space-x-1 cursor-pointer">
-      {[1, 2, 3, 4, 5].map((star) => (
+    <div className="flex items-center">
+      {[1, 2, 3, 4, 5].map((value) => (
         <FaStar
-          key={star}
-          size={20}
-          onClick={() => onRatingChange(star)}
-          className={star <= rating ? "text-yellow-400" : "text-gray-400"}
+          key={value}
+          className={`cursor-pointer text-xl ${
+            value <= rating ? "text-yellow-400" : "text-gray-500"
+          }`}
+          onClick={() => {
+            if (!readOnly && setRating) setRating(value);
+          }}
         />
       ))}
     </div>
